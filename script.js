@@ -11,7 +11,12 @@ const externalLinkEl = document.getElementById('externalLink');
 let uploadedFile = null;
 
 // Если клик по зоне — открываем проводник
-uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('click', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  fileInput.click();
+});
+
 
 // input change
 fileInput.addEventListener('change', () => {
