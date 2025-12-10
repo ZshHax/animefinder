@@ -77,7 +77,7 @@ searchBtn.addEventListener('click', async () => {
     reader.onloadend = async () => {
       const base64 = reader.result.split(",")[1]; // удаляем "data:image/jpeg;base64,"
 
-      const BASE_API = "https://YOUR_BACKEND_DOMAIN/api/search"; // ← СЮДА ВСТАВЬ СВОЙ VERCEL
+      const BASE_API = "https://animefinder-backend.vercel.app/api/search"; // ← СЮДА ВСТАВЬ СВОЙ VERCEL
 
       const resp = await fetch(BASE_API, {
         method: "POST",
