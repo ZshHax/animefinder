@@ -14,15 +14,15 @@ let selectedFile = null;
 uploadArea.addEventListener("click", () => fileInput.click());
 
 // === When file selected ===
-fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+fileInput.addEventListener("change", () => {
+  if (!fileInput.files || fileInput.files.length === 0) return;
 
-    selectedFile = file;
+  selectedFile = fileInput.files[0];
 
-    uploadArea.querySelector(".upload-text").textContent = "Image selected ✓";
-    searchBtn.disabled = false;
+  uploadArea.innerHTML = `<span class="upload-text">Image selected ✓</span>`;
+  searchBtn.disabled = false;  // активируем кнопку
 });
+
 
 // === SEARCH BUTTON ===
 searchBtn.addEventListener("click", async () => {
