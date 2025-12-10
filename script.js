@@ -1,57 +1,76 @@
-const fileInput = document.getElementById('fileInput');
-const searchBtn = document.getElementById('searchBtn');
+document.getElementById("imageInput").addEventListener("change", function () {
+    const preview = document.getElementById("preview");
+    const file = this.files[0];
 
-let uploadedFile = null;
-
-fileInput.addEventListener('change', () => {
-  if (fileInput.files.length) {
-    uploadedFile = fileInput.files[0];
-    searchBtn.disabled = false;
-  }
-});
-
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
-const API = "https://animefinder-backend.vercel.app/api/search";
-
-searchBtn.addEventListener('click', async () => {
-  if (!uploadedFile) return;
-
-  searchBtn.textContent = "Searching...";
-  searchBtn.disabled = true;
-
-  try {
-    const dataUrl = await readFileAsDataURL(uploadedFile);
-
-    const resp = await fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: dataUrl })
-    });
-
-    const json = await resp.json();
-
-    if (!resp.ok) {
-      alert("Server error " + resp.status + ":\n" + JSON.stringify(json));
-      console.error(json);
-      return;
+    if (!file) {
+        preview.style.display = "none";
+        return;
     }
 
-    console.log("RESULT:", json);
-    alert("FOUND!\n" + JSON.stringify(json, null, 2));
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        preview.src = e.target.result;
+        preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+});
 
-  } catch (e) {
-    console.error(e);
-    alert("Failed: " + e.message);
-  }
+document.getElementById("searchForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
 
-  searchBtn.textContent = "Search Anime";
-  searchBtn.disabled = false;
+    const fileInput = document.getElementById("imageInput");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert("Please upload an image first");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const resultsDiv = document.getElementById("results");
+    resultsDiv.innerHTML = "<p>Searching…</p>";
+
+    try {
+        const response = await fetch("https://animefinder-backend.vercel.app/api/search", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("Backend returned error", data);
+            resultsDiv.innerHTML = `<p class="error">Error: ${data.error || "Unknown server error"}</p>`;
+            return;
+        }
+
+        if (!data || !data.result || data.result.length === 0) {
+            resultsDiv.innerHTML = "<p>No matches found.</p>";
+            return;
+        }
+
+        // render results
+        resultsDiv.innerHTML = "";
+        data.result.forEach(item => {
+            const el = document.createElement("div");
+            el.className = "result-item";
+
+            el.innerHTML = `
+                <img src="${item.image}" alt="preview">
+                <div class="info">
+                    <h3>${item.filename}</h3>
+                    <p>Episode: ${item.episode}</p>
+                    <p>Similarity: ${(item.similarity * 100).toFixed(2)}%</p>
+                </div>
+            `;
+
+            resultsDiv.appendChild(el);
+        });
+
+    } catch (err) {
+        console.error("Frontend error:", err);
+        resultsDiv.innerHTML = `<p class="error">Request failed. Check console.</p>`;
+    }
 });
