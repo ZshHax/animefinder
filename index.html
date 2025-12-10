@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find Anime by Image</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="container">
+    <h1 class="title">Find anime by image</h1>
+    <p class="subtitle">Upload a screenshot or character photo</p>
+
+    <label class="upload-box">
+      <input type="file" accept="image/*" id="fileInput" hidden>
+      <div class="upload-area">
+        <span class="upload-text">Tap / Click to upload image</span>
+
+      </div>
+    </label>
+
+    <button class="btn" id="searchBtn" disabled>Search Anime</button>
+
+    <div class="result" id="result" style="display: none;">
+      <div class="result-card">
+        <img src="" alt="poster" id="poster" class="poster">
+        <div class="info">
+          <h2 class="anime-title" id="animeTitle"></h2>
+          <p class="anime-data" id="animeData"></p>
+          <a href="#" target="_blank" id="externalLink" class="link-button">Open details</a>
+        </div>
+      </div>
+    </div>
+<footer class="footer">
+  <a href="https://t.me/ZshHax" target="_blank">designed & developed by ZshHax</a>
+</footer>
+  </div>
+
+  <script>
+  const fileInput = document.getElementById('fileInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const resultEl = document.getElementById('result');
+  const posterEl = document.getElementById('poster');
+  const animeTitleEl = document.getElementById('animeTitle');
+  const animeDataEl = document.getElementById('animeData');
+  const externalLinkEl = document.getElementById('externalLink');
+
+  let uploadedFile = null;
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) {
+      uploadedFile = fileInput.files[0];
+      searchBtn.disabled = false;
+    }
+  });
+
+  async function fileToDataURL(file) {
+    return await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+  }
+
+searchBtn.addEventListener('click', async () => {
+  if (!uploadedFile) return;
+
+  searchBtn.textContent = "Searching...";
+  searchBtn.disabled = true;
+
+  try {
+    // Читаем файл → base64
+    const reader = new FileReader();
+    
+    reader.onloadend = async () => {
+      const base64 = reader.result.split(",")[1]; // удаляем "data:image/jpeg;base64,"
+
+      const BASE_API = "https://YOUR_BACKEND_DOMAIN/api/search"; // ← СЮДА ВСТАВЬ СВОЙ VERCEL
+
+      const resp = await fetch(BASE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64 })
+      });
+
+      const j = await resp.json();
+
+      if (!j.result || j.result.length === 0) {
+        animeTitleEl.textContent = "No matches found";
+        animeDataEl.textContent = "";
+        posterEl.src = "";
+        externalLinkEl.href = "#";
+        resultEl.style.display = "block";
+        return;
+      }
+
+      const best = j.result[0];
+
+      posterEl.src = best.image || "https://placehold.co/200x300";
+
+      animeTitleEl.textContent =
+        best.anilist?.title?.english ||
+        best.anilist?.title?.romaji ||
+        "Unknown";
+
+      animeDataEl.textContent =
+        `Episode: ${best.episode ?? "?"} · ` +
+        `${Math.round(best.similarity * 100)}% match`;
+
+      externalLinkEl.href = `https://anilist.co/anime/${best.anilist.id}`;
+      externalLinkEl.target = "_blank";
+
+      resultEl.style.display = "block";
+    };
+
+    reader.readAsDataURL(uploadedFile);
+  } catch (err) {
+    alert("Ошибка: " + err.message);
+    console.error(err);
+  } finally {
+    searchBtn.textContent = "Search Anime";
+    searchBtn.disabled = false;
+  }
+});
+</script>
+
+
+
+</body>
+</html>
