@@ -44,13 +44,11 @@ searchBtn.addEventListener('click', async () => {
 
   try {
     const dataUrl = await readFileAsDataURL(uploadedFile);
-    // чистый base64 без префикса
-    const base64 = dataUrl.split(',')[1];
 
     const resp = await fetch(BASE_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64 })
+      body: JSON.stringify({ image: dataUrl }) // <── отправляем полный dataURL
     });
 
     if (!resp.ok) {
