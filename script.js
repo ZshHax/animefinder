@@ -1,100 +1,57 @@
-// script.js
 const fileInput = document.getElementById('fileInput');
-const uploadArea = document.getElementById('uploadArea');
 const searchBtn = document.getElementById('searchBtn');
-const resultEl = document.getElementById('result');
-const posterEl = document.getElementById('poster');
-const animeTitleEl = document.getElementById('animeTitle');
-const animeDataEl = document.getElementById('animeData');
-const externalLinkEl = document.getElementById('externalLink');
 
 let uploadedFile = null;
 
-// Если клик по зоне — открываем проводник
-uploadArea.addEventListener('click', (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  fileInput.click();
-});
-
-
-// input change
 fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length) {
+  if (fileInput.files.length) {
     uploadedFile = fileInput.files[0];
     searchBtn.disabled = false;
   }
 });
 
-// утилита: читаем файл как dataURL
 function readFileAsDataURL(file) {
-  return new Promise((res, rej) => {
+  return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
     r.readAsDataURL(file);
   });
 }
 
-// <-- Заменить, если хочешь другой backend -->
-const BASE_API = "https://animefinder-backend.vercel.app/api/search";
-// ------------------------------------------------------------
+const API = "https://animefinder-backend.vercel.app/api/search";
 
 searchBtn.addEventListener('click', async () => {
   if (!uploadedFile) return;
 
-  searchBtn.textContent = 'Searching...';
+  searchBtn.textContent = "Searching...";
   searchBtn.disabled = true;
-  resultEl.style.display = 'none';
 
   try {
     const dataUrl = await readFileAsDataURL(uploadedFile);
 
-    const resp = await fetch(BASE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl }) // <── отправляем полный dataURL
+    const resp = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: dataUrl })
     });
 
+    const json = await resp.json();
+
     if (!resp.ok) {
-      // пробуем прочитать тело ошибки
-      const text = await resp.text();
-      console.error('Backend returned error', resp.status, text);
-      alert('Server error: ' + resp.status + '\n' + (text || 'See console'));
+      alert("Server error " + resp.status + ":\n" + JSON.stringify(json));
+      console.error(json);
       return;
     }
 
-    const j = await resp.json();
+    console.log("RESULT:", json);
+    alert("FOUND!\n" + JSON.stringify(json, null, 2));
 
-    if (!j || !j.result || j.result.length === 0) {
-      animeTitleEl.textContent = 'No matches found';
-      animeDataEl.textContent = '';
-      posterEl.src = '';
-      externalLinkEl.href = '#';
-      resultEl.style.display = 'block';
-      return;
-    }
-
-    const best = j.result[0];
-
-    posterEl.src = best.image || (best.anilist && (best.anilist.coverImage?.large || best.anilist.coverImage?.medium)) || 'https://placehold.co/200x300';
-    const title = (best.anilist && (best.anilist.title?.english || best.anilist.title?.romaji)) || best.filename || 'Unknown';
-    animeTitleEl.textContent = title;
-
-    const episode = best.episode ?? '—';
-    const at = best.from ? new Date(best.from * 1000).toISOString().substr(11, 8) : '';
-    const similarity = best.similarity ? (best.similarity * 100).toFixed(1) + '%' : '';
-    animeDataEl.textContent = `Episode ${episode} · ${at} · ${similarity}`;
-
-    externalLinkEl.href = (best.anilist && ('https://anilist.co/anime/' + best.anilist.id)) || best.site || '#';
-    externalLinkEl.target = '_blank';
-
-    resultEl.style.display = 'block';
-  } catch (err) {
-    console.error('Search error:', err);
-    alert('Ошибка при поиске. Смотри консоль.');
-  } finally {
-    searchBtn.textContent = 'Search Anime';
-    searchBtn.disabled = false;
+  } catch (e) {
+    console.error(e);
+    alert("Failed: " + e.message);
   }
+
+  searchBtn.textContent = "Search Anime";
+  searchBtn.disabled = false;
 });
