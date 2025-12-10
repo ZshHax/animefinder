@@ -1,91 +1,97 @@
-const fileInput = document.getElementById('fileInput');
-const searchBtn = document.getElementById('searchBtn');
-const resultEl = document.getElementById('result');
-const posterEl = document.getElementById('poster');
-const animeTitleEl = document.getElementById('animeTitle');
-const animeDataEl = document.getElementById('animeData');
-const externalLinkEl = document.getElementById('externalLink');
+const fileInput = document.getElementById("fileInput");
+const uploadArea = document.getElementById("uploadArea");
+const searchBtn = document.getElementById("searchBtn");
 
-let uploadedFile = null;
+const resultBox = document.getElementById("result");
+const poster = document.getElementById("poster");
+const animeTitle = document.getElementById("animeTitle");
+const animeData = document.getElementById("animeData");
+const externalLink = document.getElementById("externalLink");
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files.length) {
-    uploadedFile = fileInput.files[0];
+let selectedFile = null;
+
+// === Upload click ===
+uploadArea.addEventListener("click", () => fileInput.click());
+
+// === When file selected ===
+fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    selectedFile = file;
+
+    uploadArea.querySelector(".upload-text").textContent = "Image selected ✓";
     searchBtn.disabled = false;
-  }
 });
 
-async function toBase64(file) {
-  return new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = () => res(reader.result.split(",")[1]);
-    reader.onerror = (err) => rej(err);
-    reader.readAsDataURL(file);
-  });
-}
-
-searchBtn.addEventListener('click', async () => {
-  if (!uploadedFile) return;
-
-  searchBtn.textContent = "Searching...";
-  searchBtn.disabled = true;
-
-  try {
-    const base64 = await toBase64(uploadedFile);
-
-    const BASE_API = "https://animefinder-backend.vercel.app/api/search";
-
-    const resp = await fetch(BASE_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: base64 })
-    });
-
-    const data = await resp.json();
-
-    console.log("SauceNAO response:", data);
-
-    if (!data.results || data.results.length === 0) {
-      animeTitleEl.textContent = "No matches found";
-      animeDataEl.textContent = "";
-      posterEl.src = "";
-      externalLinkEl.href = "#";
-      resultEl.style.display = "block";
-      return;
+// === SEARCH BUTTON ===
+searchBtn.addEventListener("click", async () => {
+    if (!selectedFile) {
+        alert("Please upload an image first.");
+        return;
     }
 
-    const best = data.results[0];
+    searchBtn.textContent = "Searching...";
+    searchBtn.disabled = true;
 
-    // выбираем лучший заголовок
-    const title =
-      best.data.title ||
-      best.data.source ||
-      best.data.jp_name ||
-      "Unknown title";
+    const formData = new FormData();
+    formData.append("image", selectedFile);
 
-    animeTitleEl.textContent = title;
+    try {
+        const response = await fetch("https://animefinder-backend.vercel.app/api/search", {
+            method: "POST",
+            body: formData,
+        });
 
-    // постер
-    posterEl.src = best.header.thumbnail || "https://placehold.co/200x300";
+        const data = await response.json();
+        console.log("SauceNAO response:", data);
 
-    // похожесть
-    animeDataEl.textContent = `Similarity: ${best.header.similarity}%`;
+        // === If error OR no results ===
+        if (!data.results || data.results.length === 0) {
+            animeTitle.textContent = "No matches found";
+            animeData.textContent = "";
+            poster.src = "";
+            externalLink.style.display = "none";
+            resultBox.style.display = "block";
+            searchBtn.textContent = "Search Anime";
+            searchBtn.disabled = false;
+            return;
+        }
 
-    // ссылка если есть
-    if (best.data.ext_urls && best.data.ext_urls.length > 0) {
-      externalLinkEl.href = best.data.ext_urls[0];
-    } else {
-      externalLinkEl.href = "#";
+        const best = data.results[0];
+
+        // === TITLE ===
+        animeTitle.textContent =
+            best.data.title ||
+            best.data.title_romaji ||
+            best.data.title_english ||
+            "Unknown anime";
+
+        // === OTHER INFO (optional) ===
+        animeData.textContent =
+            best.data.source ||
+            best.data.part ||
+            best.data.est_time ||
+            "";
+
+        // === Thumbnail ===
+        poster.src = best.header.thumbnail || "";
+
+        // === External link ===
+        if (best.data.ext_urls && best.data.ext_urls.length > 0) {
+            externalLink.href = best.data.ext_urls[0];
+            externalLink.style.display = "inline-block";
+        } else {
+            externalLink.style.display = "none";
+        }
+
+        resultBox.style.display = "block";
+
+    } catch (e) {
+        console.error("Fetch error:", e);
+        alert("API request failed, check backend and CORS.");
     }
 
-    externalLinkEl.target = "_blank";
-    resultEl.style.display = "block";
-
-  } catch (err) {
-    alert("Ошибка: " + err.message);
-    console.error(err);
-  } finally {
     searchBtn.textContent = "Search Anime";
     searchBtn.disabled = false;
-  }
 });
