@@ -16,23 +16,25 @@ fileInput.addEventListener("change", () => {
 });
 
 // Загружаем картинку на imgbb → получаем URL → отправляем в trace.moe
-async function uploadToImgbb(file) {
-  const API_KEY = "eb6002b5f8d3e3f209833e690ea0684d"; // рабочий ключ
-
+async function uploadToCatbox(file) {
   const form = new FormData();
-  form.append("image", file);
+  form.append("reqtype", "fileupload");
+  form.append("fileToUpload", file);
 
-  const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+  const res = await fetch("https://catbox.moe/user/api.php", {
     method: "POST",
     body: form
   });
 
-  const json = await res.json();
+  const url = await res.text();
 
-  if (!json.success) throw new Error("imgbb upload failed");
+  if (!url.startsWith("http")) {
+    throw new Error("Catbox upload failed: " + url);
+  }
 
-  return json.data.url;
+  return url;
 }
+
 
 searchBtn.addEventListener("click", async () => {
   if (!uploadedFile) return;
