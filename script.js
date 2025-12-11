@@ -44,7 +44,8 @@ searchBtn.addEventListener("click", async () => {
 
   try {
     // 1) Загружаем файл на imgbb
-    const imageUrl = await uploadToImgbb(uploadedFile);
+    const imageUrl = await uploadToCatbox(uploadedFile);
+
 
     // 2) Отправляем URL напрямую в trace.moe
     const apiURL = `https://api.trace.moe/search?url=${encodeURIComponent(imageUrl)}`;
