@@ -38,44 +38,46 @@ searchBtn.addEventListener("click", async () => {
     formData.append("image", selectedFile);
 
     try {
-        const response = await fetch("https://animefinder-backend.vercel.app/api/search", {
-            method: "POST",
-            body: formData,
-        });
+        // ... внутри searchBtn.addEventListener ...
 
-        const data = await response.json();
-        console.log("SauceNAO response:", data);
+const response = await fetch("https://animefinder-backend.vercel.app/api/search", { // Твой URL
+    method: "POST",
+    body: selectedFile, // ВАЖНО: Для этого бэкенда отправляем файл напрямую, БЕЗ FormData!
+    headers: {
+        "Content-Type": selectedFile.type 
+    }
+});
 
-        // === If error OR no results ===
-        if (!data.results || data.results.length === 0) {
-            animeTitle.textContent = "No matches found";
-            animeData.textContent = "";
-            poster.src = "";
-            externalLink.style.display = "none";
-            resultBox.style.display = "block";
-            searchBtn.textContent = "Search Anime";
-            searchBtn.disabled = false;
-            return;
-        }
+const data = await response.json();
+console.log("Trace.moe response:", data);
 
-        const best = data.results[0];
+// Trace.moe возвращает объект: { result:Array, error:String }
+if (!data.result || data.result.length === 0) {
+    animeTitle.textContent = "No matches found";
+    return;
+}
 
-        // === TITLE ===
-        animeTitle.textContent =
-            best.data.title ||
-            best.data.title_romaji ||
-            best.data.title_english ||
-            "Unknown anime";
+const best = data.result[0]; // Лучшее совпадение
 
-        // === OTHER INFO (optional) ===
-        animeData.textContent =
-            best.data.source ||
-            best.data.part ||
-            best.data.est_time ||
-            "";
+// === ОБНОВЛЕННЫЙ ПАРСИНГ ПОД TRACE.MOE ===
 
-        // === Thumbnail ===
-        poster.src = best.header.thumbnail || "";
+// 1. Название (Trace.moe с параметром ?anilistInfo возвращает данные из Anilist)
+if (best.anilist && best.anilist.title) {
+    animeTitle.textContent = best.anilist.title.english || best.anilist.title.romaji || "Unknown Title";
+} else {
+    animeTitle.textContent = best.filename;
+}
+
+// 2. Эпизод и время
+const minutes = Math.floor(best.from / 60);
+const seconds = Math.floor(best.from % 60);
+animeData.textContent = `Episode: ${best.episode} | Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+// 3. Картинка (превью кадра)
+poster.src = best.image; // Trace.moe возвращает URL картинки в поле image
+
+// 4. Видео (Trace.moe дает видео фрагмент!)
+// Если у тебя есть <video> тег, можно вставить best.video
 
         // === External link ===
         if (best.data.ext_urls && best.data.ext_urls.length > 0) {
