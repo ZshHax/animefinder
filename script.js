@@ -1,99 +1,85 @@
 const fileInput = document.getElementById("fileInput");
-const uploadArea = document.getElementById("uploadArea");
 const searchBtn = document.getElementById("searchBtn");
+const resultEl = document.getElementById("result");
+const posterEl = document.getElementById("poster");
+const animeTitleEl = document.getElementById("animeTitle");
+const animeDataEl = document.getElementById("animeData");
+const externalLinkEl = document.getElementById("externalLink");
 
-const resultBox = document.getElementById("result");
-const poster = document.getElementById("poster");
-const animeTitle = document.getElementById("animeTitle");
-const animeData = document.getElementById("animeData");
-const externalLink = document.getElementById("externalLink");
+let uploadedFile = null;
 
-let selectedFile = null;
-
-// === Upload click ===
-uploadArea.addEventListener("click", () => fileInput.click());
-
-// === When file selected ===
 fileInput.addEventListener("change", () => {
-  if (!fileInput.files || fileInput.files.length === 0) return;
-
-  selectedFile = fileInput.files[0];
-
-  uploadArea.innerHTML = `<span class="upload-text">Image selected ✓</span>`;
-  searchBtn.disabled = false;  // активируем кнопку
-});
-
-
-// === SEARCH BUTTON ===
-searchBtn.addEventListener("click", async () => {
-    if (!selectedFile) {
-        alert("Please upload an image first.");
-        return;
-    }
-
-    searchBtn.textContent = "Searching...";
-    searchBtn.disabled = true;
-
-    const formData = new FormData();
-    formData.append("image", selectedFile);
-
-    try {
-        // ... внутри searchBtn.addEventListener ...
-
-const response = await fetch("https://animefinder-backend.vercel.app/api/search", { // Твой URL
-    method: "POST",
-    body: selectedFile, // ВАЖНО: Для этого бэкенда отправляем файл напрямую, БЕЗ FormData!
-    headers: {
-        "Content-Type": selectedFile.type 
-    }
-});
-
-const data = await response.json();
-console.log("Trace.moe response:", data);
-
-// Trace.moe возвращает объект: { result:Array, error:String }
-if (!data.result || data.result.length === 0) {
-    animeTitle.textContent = "No matches found";
-    return;
-}
-
-const best = data.result[0]; // Лучшее совпадение
-
-// === ОБНОВЛЕННЫЙ ПАРСИНГ ПОД TRACE.MOE ===
-
-// 1. Название (Trace.moe с параметром ?anilistInfo возвращает данные из Anilist)
-if (best.anilist && best.anilist.title) {
-    animeTitle.textContent = best.anilist.title.english || best.anilist.title.romaji || "Unknown Title";
-} else {
-    animeTitle.textContent = best.filename;
-}
-
-// 2. Эпизод и время
-const minutes = Math.floor(best.from / 60);
-const seconds = Math.floor(best.from % 60);
-animeData.textContent = `Episode: ${best.episode} | Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-// 3. Картинка (превью кадра)
-poster.src = best.image; // Trace.moe возвращает URL картинки в поле image
-
-// 4. Видео (Trace.moe дает видео фрагмент!)
-// Если у тебя есть <video> тег, можно вставить best.video
-
-        // === External link ===
-        if (best.data.ext_urls && best.data.ext_urls.length > 0) {
-            externalLink.href = best.data.ext_urls[0];
-            externalLink.style.display = "inline-block";
-        } else {
-            externalLink.style.display = "none";
-        }
-
-        resultBox.style.display = "block";
-
-    } catch (e) {
-        console.error("Fetch error:", e);
-        alert("API request failed, check backend and CORS.");
-    }
-
-    searchBtn.textContent = "Search Anime";
+  if (fileInput.files.length) {
+    uploadedFile = fileInput.files[0];
     searchBtn.disabled = false;
+  }
+});
+
+// Загружаем картинку на imgbb → получаем URL → отправляем в trace.moe
+async function uploadToImgbb(file) {
+  const API_KEY = "eb6002b5f8d3e3f209833e690ea0684d"; // рабочий ключ
+
+  const form = new FormData();
+  form.append("image", file);
+
+  const res = await fetch(`https://api.imgbb.com/1/upload?key=${API_KEY}`, {
+    method: "POST",
+    body: form
+  });
+
+  const json = await res.json();
+
+  if (!json.success) throw new Error("imgbb upload failed");
+
+  return json.data.url;
+}
+
+searchBtn.addEventListener("click", async () => {
+  if (!uploadedFile) return;
+
+  searchBtn.textContent = "Searching...";
+  searchBtn.disabled = true;
+
+  try {
+    // 1) Загружаем файл на imgbb
+    const imageUrl = await uploadToImgbb(uploadedFile);
+
+    // 2) Отправляем URL напрямую в trace.moe
+    const apiURL = `https://api.trace.moe/search?url=${encodeURIComponent(imageUrl)}`;
+
+    const resp = await fetch(apiURL);
+    const data = await resp.json();
+
+    if (!data.result || data.result.length === 0) {
+      animeTitleEl.textContent = "No matches found";
+      animeDataEl.textContent = "";
+      posterEl.src = "";
+      externalLinkEl.href = "#";
+      resultEl.style.display = "block";
+      return;
+    }
+
+    const best = data.result[0];
+
+    posterEl.src = best.image;
+    animeTitleEl.textContent =
+      best.anilist?.title?.english ||
+      best.anilist?.title?.romaji ||
+      "Unknown";
+
+    animeDataEl.textContent =
+      `Episode: ${best.episode ?? "?"} · ${Math.round(best.similarity * 100)}% match`;
+
+    externalLinkEl.href = `https://anilist.co/anime/${best.anilist.id}`;
+    externalLinkEl.target = "_blank";
+
+    resultEl.style.display = "block";
+
+  } catch (err) {
+    alert("Search error: " + err.message);
+    console.error(err);
+  }
+
+  searchBtn.textContent = "Search Anime";
+  searchBtn.disabled = false;
 });
