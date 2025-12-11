@@ -1,88 +1,51 @@
-const fileInput = document.getElementById("fileInput");
-const searchBtn = document.getElementById("searchBtn");
-const resultEl = document.getElementById("result");
-const posterEl = document.getElementById("poster");
-const animeTitleEl = document.getElementById("animeTitle");
-const animeDataEl = document.getElementById("animeData");
-const externalLinkEl = document.getElementById("externalLink");
-
-let uploadedFile = null;
-
-fileInput.addEventListener("change", () => {
-  if (fileInput.files.length) {
-    uploadedFile = fileInput.files[0];
-    searchBtn.disabled = false;
-  }
-});
-
-// Загружаем картинку на imgbb → получаем URL → отправляем в trace.moe
-async function uploadToCatbox(file) {
-  const form = new FormData();
-  form.append("reqtype", "fileupload");
-  form.append("fileToUpload", file);
-
-  const res = await fetch("https://catbox.moe/user/api.php", {
-    method: "POST",
-    body: form
-  });
-
-  const url = await res.text();
-
-  if (!url.startsWith("http")) {
-    throw new Error("Catbox upload failed: " + url);
-  }
-
-  return url;
-}
-
-
 searchBtn.addEventListener("click", async () => {
   if (!uploadedFile) return;
 
   searchBtn.textContent = "Searching...";
   searchBtn.disabled = true;
 
-  try {
-    // 1) Загружаем файл на imgbb
-    const imageUrl = await uploadToCatbox(uploadedFile);
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    const base64 = reader.result.split(",")[1];
 
+    try {
+      const resp = await fetch("https://animefinder-backend.vercel.app/api/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ image: base64 })
+      });
 
-    // 2) Отправляем URL напрямую в trace.moe
-    const apiURL = `https://api.trace.moe/search?url=${encodeURIComponent(imageUrl)}`;
+      const data = await resp.json();
 
-    const resp = await fetch(apiURL);
-    const data = await resp.json();
+      if (!data.result || data.result.length === 0) {
+        animeTitleEl.textContent = "Not found";
+        resultEl.style.display = "block";
+        return;
+      }
 
-    if (!data.result || data.result.length === 0) {
-      animeTitleEl.textContent = "No matches found";
-      animeDataEl.textContent = "";
-      posterEl.src = "";
-      externalLinkEl.href = "#";
+      const best = data.result[0];
+
+      posterEl.src = best.image;
+      animeTitleEl.textContent =
+        best.anilist.title.english ||
+        best.anilist.title.romaji ||
+        "Unknown";
+
+      animeDataEl.textContent =
+        `Episode ${best.episode} · ${Math.round(best.similarity * 100)}% match`;
+
+      externalLinkEl.href = `https://anilist.co/anime/${best.anilist.id}`;
       resultEl.style.display = "block";
-      return;
+
+    } catch (err) {
+      alert("Error: " + err.message);
     }
 
-    const best = data.result[0];
+    searchBtn.textContent = "Search Anime";
+    searchBtn.disabled = false;
+  };
 
-    posterEl.src = best.image;
-    animeTitleEl.textContent =
-      best.anilist?.title?.english ||
-      best.anilist?.title?.romaji ||
-      "Unknown";
-
-    animeDataEl.textContent =
-      `Episode: ${best.episode ?? "?"} · ${Math.round(best.similarity * 100)}% match`;
-
-    externalLinkEl.href = `https://anilist.co/anime/${best.anilist.id}`;
-    externalLinkEl.target = "_blank";
-
-    resultEl.style.display = "block";
-
-  } catch (err) {
-    alert("Search error: " + err.message);
-    console.error(err);
-  }
-
-  searchBtn.textContent = "Search Anime";
-  searchBtn.disabled = false;
+  reader.readAsDataURL(uploadedFile);
 });
